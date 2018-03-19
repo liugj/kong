@@ -70,6 +70,7 @@ function _M.new(opts)
   end
 
   local mlcache, err = resty_mlcache.new("kong_db_cache", SHM_CACHE, {
+    shm_miss         = "kong_db_cache_miss",
     lru_size         = LRU_SIZE,
     ttl              = max(opts.ttl     or 3600, 0),
     neg_ttl          = max(opts.neg_ttl or 300,  0),
