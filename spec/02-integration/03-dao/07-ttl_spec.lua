@@ -8,16 +8,17 @@ helpers.for_each_dao(function(kong_config)
     setup(function()
       factory = assert(Factory.new(kong_config))
       assert(factory:run_migrations())
-
-      factory:truncate_tables()
     end)
-    after_each(function()
+    before_each(function()
       factory.apis:truncate()
       if kong_config.database == "postgres" then
         local DB = require "kong.dao.db.postgres"
         local _db = DB.new(kong_config)
         assert(_db:query("TRUNCATE TABLE ttls"))
       end
+    end)
+    teardown(function()
+      factory:truncate_tables()
     end)
 
     it("on insert", function()
@@ -34,8 +35,6 @@ helpers.for_each_dao(function(kong_config)
 
       spec_helpers.wait_until(function()
         row, err = factory.apis:find {id = api.id}
-print(row)
-print(err)
         assert.falsy(err)
         return row == nil
       end, 10)
