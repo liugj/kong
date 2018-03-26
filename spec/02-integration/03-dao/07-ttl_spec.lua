@@ -34,6 +34,8 @@ helpers.for_each_dao(function(kong_config)
 
       spec_helpers.wait_until(function()
         row, err = factory.apis:find {id = api.id}
+print(row)
+print(err)
         assert.falsy(err)
         return row == nil
       end, 10)
