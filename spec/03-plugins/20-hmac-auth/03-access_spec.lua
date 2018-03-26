@@ -1078,6 +1078,188 @@ for _, strategy in helpers.each_strategy() do
         assert.res_status(200, res)
       end)
 
+      it("should pass with GET with request-line having query param", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request?name=foo HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request?name=foo",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        assert.res_status(200, res)
+
+        encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request/?name=foo HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request/?name=foo",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        assert.res_status(200, res)
+      end)
+
+      it("should pass with GET with request-line having encoded query param", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request?name=foo bar HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request?name=foo bar",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        local body = assert.res_status(200, res)
+        local json_body = cjson.decode(body)
+        assert.is.equal("foo bar", json_body.uri_args.name)
+
+        encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request?name=foo bár HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request?name=foo bár",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        local body = assert.res_status(200, res)
+        local json_body = cjson.decode(body)
+        assert.is.equal("foo bár", json_body.uri_args.name)
+      end)
+
+      it("should pass with GET with request-line having multiple query params", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request?name=foo bar&address=san francisco HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request?name=foo bar&address=san francisco",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        local body = assert.res_status(200, res)
+        local json_body = cjson.decode(body)
+        assert.is.equal("foo bar", json_body.uri_args.name)
+        assert.is.equal("san francisco", json_body.uri_args.address)
+      end)
+
+      it("should pass with GET with request-line having multiple same query param", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request?name=foo&name=bar HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request?name=foo&name=bar",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        local body = assert.res_status(200, res)
+        local json_body = cjson.decode(body)
+        assert.is.equal("foo", json_body.uri_args.name[1])
+        assert.is.equal("bar", json_body.uri_args.name[2])
+      end)
+
+      it("should pass with GET with request-line having no uri", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET / HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        assert.res_status(200, res)
+      end)
+
+      it("should pass with GET with request-line having encode path param", function()
+        local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
+        local encodedSignature = ngx.encode_base64(
+          hmac_sha1_binary("secret", "date: "
+            .. date .. "\n" .. "content-md5: md5" .. "\nGET /request/some value/?name=foo&name=bar HTTP/1.1"))
+        local hmacAuth = [[hmac username="bob",  algorithm="hmac-sha1", ]]
+          .. [[headers="date content-md5 request-line", signature="]]
+          .. encodedSignature .. [["]]
+        local res = assert(proxy_client:send {
+          method  = "GET",
+          path    = "/request/some value/?name=foo&name=bar",
+          body    = {},
+          headers = {
+            ["HOST"]                = "hmacauth5.com",
+            date                    = date,
+            ["proxy-authorization"] = hmacAuth,
+            ["content-md5"]         = "md5",
+          },
+        })
+        local body = assert.res_status(200, res)
+        local json_body = cjson.decode(body)
+        assert.is.equal("foo", json_body.uri_args.name[1])
+        assert.is.equal("bar", json_body.uri_args.name[2])
+      end)
+
       it("should fail with GET when enforced header request-line missing", function()
         local date = os.date("!%a, %d %b %Y %H:%M:%S GMT")
         local encodedSignature = ngx.encode_base64(
