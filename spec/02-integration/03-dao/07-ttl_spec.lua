@@ -12,7 +12,12 @@ helpers.for_each_dao(function(kong_config)
       factory:truncate_tables()
     end)
     after_each(function()
-      factory:truncate_tables()
+      factory.apis:truncate()
+      if kong_config.database == "postgres" then
+        local DB = require "kong.dao.db.postgres"
+        local _db = DB.new(kong_config)
+        assert(_db:query("TRUNCATE TABLE ttls"))
+      end
     end)
 
     it("on insert", function()
@@ -20,20 +25,18 @@ helpers.for_each_dao(function(kong_config)
         name         = "example",
         hosts        = { "example.com" },
         upstream_url = "http://example.com"
-      }, { ttl = 3 })
+      }, { ttl = 1 })
       assert.falsy(err)
 
       local row, err = factory.apis:find {id = api.id}
       assert.falsy(err)
       assert.truthy(row)
 
-      ngx.sleep(4)
-
       spec_helpers.wait_until(function()
         row, err = factory.apis:find {id = api.id}
         assert.falsy(err)
         return row == nil
-      end, 1)
+      end, 10)
     end)
 
     it("on update", function()
@@ -41,7 +44,7 @@ helpers.for_each_dao(function(kong_config)
         name         = "example",
         hosts        = { "example.com" },
         upstream_url = "http://example.com"
-      }, { ttl = 3 })
+      }, { ttl = 1 })
       assert.falsy(err)
 
       local row, err = factory.apis:find {id = api.id}
@@ -49,21 +52,17 @@ helpers.for_each_dao(function(kong_config)
       assert.truthy(row)
 
       -- Updating the TTL to a higher value
-      factory.apis:update({ name = "example2" }, { id = api.id }, { ttl = 4 })
-
-      ngx.sleep(1)
+      factory.apis:update({ name = "example2" }, { id = api.id }, { ttl = 1.5 })
 
       row, err = factory.apis:find { id = api.id }
       assert.falsy(err)
       assert.truthy(row)
 
-      ngx.sleep(4)
-
       spec_helpers.wait_until(function()
         row, err = factory.apis:find { id = api.id }
         assert.falsy(err)
         return row == nil
-      end, 1)
+      end, 10)
     end)
 
     if kong_config.database == "postgres" then
@@ -97,7 +96,7 @@ helpers.for_each_dao(function(kong_config)
             name         = "api-" .. i,
             hosts        = { "example" .. i .. ".com" },
             upstream_url = "http://example.com"
-          }, { ttl = 1 })
+          }, { ttl = 0.5 })
           assert.falsy(err)
         end
 
@@ -105,7 +104,7 @@ helpers.for_each_dao(function(kong_config)
           name         = "long-ttl",
           hosts        = { "example-longttl.com" },
           upstream_url = "http://example.com"
-        }, { ttl = 3 })
+        }, { ttl = 5 })
         assert.falsy(err)
 
         local res, err = _db:query("SELECT COUNT(*) FROM apis")
@@ -116,21 +115,19 @@ helpers.for_each_dao(function(kong_config)
         assert.falsy(err)
         assert.truthy(res[1].count >= 5)
 
-        ngx.sleep(2)
-
-        local ok, err = _db:clear_expired_ttl()
-        assert.falsy(err)
-        assert.truthy(ok)
-
         spec_helpers.wait_until(function()
+
+          local ok, err = _db:clear_expired_ttl()
+          assert.falsy(err)
+          assert.truthy(ok)
+
           local res_apis, err = _db:query("SELECT COUNT(*) FROM apis")
           assert.falsy(err)
 
           local res_ttls, err = _db:query("SELECT COUNT(*) FROM ttls")
           assert.falsy(err)
-
           return res_apis[1].count == 1 and res_ttls[1].count == 1
-        end, 1)
+        end, 10)
       end)
     end
   end)
