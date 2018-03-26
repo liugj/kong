@@ -212,13 +212,10 @@ local function wait_until(f, timeout)
   local texp = tstart + timeout
   local ok, res, err
 
-  while true do
+  repeat
     ok, res, err = pcall(f)
-    if not ok or res or ngx.time() >= texp then
-      break
-    end
     ngx.sleep(0.2)
-  end
+  until not ok or res or ngx.time() >= texp
 
   if not ok then
     -- report error from `f`, such as assert gone wrong
